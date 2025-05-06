@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件 Hash 验证系统</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column; /* 允许内容垂直排列 */
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #fff;
+            padding: 25px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #1a202c;
+            margin-bottom: 25px;
+            font-size: 24px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        input[type="file"],
+        input[type="url"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input[type="file"] {
+            padding: 8px;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px 15px;
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+        }
+        button:hover {
+            background-color: #3182ce;
+        }
+        .results {
+            margin-top: 25px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background-color: #f7fafc;
+        }
+        .results h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #2d3748;
+        }
+        .results p {
+            margin: 8px 0;
+            word-wrap: break-word;
+            color: #4a5568;
+        }
+        .results .match {
+            color: #38a169;
+            font-weight: bold;
+        }
+        .results .no-match {
+            color: #e53e3e;
+            font-weight: bold;
+        }
+        .results .error {
+            color: #e53e3e;
+            font-weight: bold;
+        }
+        .spinner {
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #4299e1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 0.8s linear infinite;
+            display: none;
+            margin: 20px auto;
+        }
+        .image-preview-container {
+            display: flex;
+            justify-content: space-around; /* 图片并排显示 */
+            align-items: flex-start; /* 顶部对齐 */
+            margin-top: 20px;
+            margin-bottom: 20px;
+            gap: 20px; /* 图片之间的间距 */
+            flex-wrap: wrap; /* 在小屏幕上换行 */
+        }
+        .image-box {
+            width: 45%; /* 每个图片框大约占一半宽度 */
+            min-width: 200px; /* 最小宽度 */
+            padding: 10px;
+            border: 1px dashed #cbd5e0;
+            border-radius: 6px;
+            text-align: center;
+            background-color: #f9fafb;
+        }
+        .image-box h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #4a5568;
+        }
+        .image-box img {
+            max-width: 100%;
+            max-height: 200px; /* 限制预览图片的最大高度 */
+            height: auto; /* 保持图片比例 */
+            border-radius: 4px;
+            display: block; /* 消除图片下方的空白 */
+            margin: 0 auto 10px auto; /* 居中并添加底部边距 */
+        }
+        .image-placeholder-text {
+            color: #718096;
+            font-style: italic;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>文件 Hash 验证</h1>
+    <form id="verifyForm" enctype="multipart/form-data">
+        <div>
+            <label for="localFile">选择本地图片文件:</label>
+            <input type="file" id="localFile" name="local_file" accept="image/*" required>
+        </div>
+        <div>
+            <label for="remoteUrl">远程文件 URL:</label>
+            <input type="url" id="remoteUrl" name="remote_file_url" placeholder="例如: https://example.com/images/pic.jpg" required>
+        </div>
+        <button type="submit">验证 Hash</button>
+    </form>
+
+    <div class="image-preview-container">
+        <div class="image-box" id="localImageBox">
+            <h3>本地图片预览</h3>
+            <img id="localImagePreview" src="#" alt="本地图片预览将显示在此处">
+            <p id="localImagePlaceholder" class="image-placeholder-text">尚未选择本地图片</p>
+        </div>
+        <div class="image-box" id="remoteImageBox">
+            <h3>远程图片预览</h3>
+            <img id="remoteImagePreview" src="#" alt="远程图片预览将显示在此处">
+            <p id="remoteImagePlaceholder" class="image-placeholder-text">请输入远程图片 URL</p>
+        </div>
+    </div>
+
+    <div class="spinner" id="loadingSpinner"></div>
+
+    <div id="results" class="results" style="display:none;">
+        <h2>验证结果:</h2>
+        <p><strong>本地文件 Hash:</strong> <span id="localHash"></span></p>
+        <p><strong>远程文件 Hash:</strong> <span id="remoteHash"></span></p>
+        <p><strong>是否匹配:</strong> <span id="matchStatus"></span></p>
+        <p id="errorMessageContainer" style="display:none;"><strong>错误信息:</strong> <span id="errorMessage" class="error"></span></p>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('verifyForm');
+    const resultsDiv = document.getElementById('results');
+    const localHashSpan = document.getElementById('localHash');
+    const remoteHashSpan = document.getElementById('remoteHash');
+    const matchStatusSpan = document.getElementById('matchStatus');
+    const errorMessageContainer = document.getElementById('errorMessageContainer');
+    const errorMessageSpan = document.getElementById('errorMessage');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+
+    const localFileInput = document.getElementById('localFile');
+    const localImagePreview = document.getElementById('localImagePreview');
+    const localImagePlaceholder = document.getElementById('localImagePlaceholder');
+
+    const remoteUrlInput = document.getElementById('remoteUrl');
+    const remoteImagePreview = document.getElementById('remoteImagePreview');
+    const remoteImagePlaceholder = document.getElementById('remoteImagePlaceholder');
+
+    const defaultPlaceholderSrc = "https://placehold.co/200x150/E2E8F0/718096?text=图片不存在"; // 占位图片URL
+
+    // 初始化预览区域
+    localImagePreview.style.display = 'none';
+    remoteImagePreview.style.display = 'none';
+    localImagePreview.src = "#"; // 清空，防止显示旧图片或 broken icon
+    remoteImagePreview.src = "#";
+
+
+    localFileInput.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                localImagePreview.src = e.target.result;
+                localImagePreview.style.display = 'block';
+                localImagePlaceholder.style.display = 'none';
+            }
+            reader.readAsDataURL(file);
+        } else {
+            localImagePreview.src = '#'; // 清空预览
+            localImagePreview.style.display = 'none';
+            localImagePlaceholder.style.display = 'block';
+            localImagePlaceholder.textContent = '请选择一个图片文件';
+        }
+    });
+
+    remoteUrlInput.addEventListener('input', function(event) {
+        const url = event.target.value;
+        if (url) {
+            remoteImagePreview.src = url; // 直接尝试加载
+            remoteImagePreview.style.display = 'block';
+            remoteImagePlaceholder.style.display = 'none';
+        } else {
+            remoteImagePreview.src = '#';
+            remoteImagePreview.style.display = 'none';
+            remoteImagePlaceholder.style.display = 'block';
+            remoteImagePlaceholder.textContent = '请输入远程图片 URL';
+        }
+    });
+
+    // 远程图片加载失败处理
+    remoteImagePreview.onerror = function() {
+        this.src = defaultPlaceholderSrc; // 加载失败则显示占位图
+        this.alt = "远程图片加载失败或不存在";
+        remoteImagePlaceholder.textContent = '远程图片加载失败或不存在';
+        remoteImagePlaceholder.style.display = 'block'; // 确保文字提示也显示
+    };
+    // 远程图片加载成功处理 (可选，如果需要移除文字提示)
+    remoteImagePreview.onload = function() {
+        if (this.src !== defaultPlaceholderSrc && this.src !== '#') { // 确保不是占位图或初始空值
+            remoteImagePlaceholder.style.display = 'none';
+        }
+    };
+
+
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        loadingSpinner.style.display = 'block';
+        resultsDiv.style.display = 'none';
+        errorMessageContainer.style.display = 'none';
+
+        const formData = new FormData();
+        const localFile = localFileInput.files[0];
+        const remoteUrl = remoteUrlInput.value;
+
+        if (!localFile) {
+            alert('请选择一个本地文件。');
+            loadingSpinner.style.display = 'none';
+            return;
+        }
+        if (!remoteUrl) {
+            alert('请输入远程文件 URL。');
+            loadingSpinner.style.display = 'none';
+            return;
+        }
+
+        formData.append('local_file', localFile);
+        formData.append('remote_file_url', remoteUrl);
+
+        // 提交前再次尝试加载/确认远程图片 (如果之前输入事件没有触发或失败)
+        if (remoteImagePreview.src !== remoteUrl && remoteUrl) { // 如果当前预览的不是输入的 URL
+            remoteImagePreview.src = remoteUrl;
+        }
+
+
+        try {
+            const response = await fetch('/verify', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            localHashSpan.textContent = data.local_file_hash || 'N/A';
+            remoteHashSpan.textContent = data.remote_file_hash || 'N/A';
+
+            if (data.match) {
+                matchStatusSpan.textContent = '是';
+                matchStatusSpan.className = 'match';
+            } else {
+                matchStatusSpan.textContent = '否';
+                matchStatusSpan.className = 'no-match';
+            }
+
+            if (data.error) {
+                errorMessageSpan.textContent = data.error;
+                errorMessageContainer.style.display = 'block';
+                // 如果后端返回错误，特别是关于远程文件的，可以再次触发远程图片错误处理
+                if (data.error.toLowerCase().includes("下载远程文件失败") || data.error.toLowerCase().includes("http 状态码错误")) {
+                    remoteImagePreview.onerror(); // 手动触发错误处理以显示占位图
+                }
+            } else {
+                errorMessageContainer.style.display = 'none';
+            }
+            resultsDiv.style.display = 'block';
+
+        } catch (error) {
+            console.error('提交表单时发生错误:', error);
+            resultsDiv.style.display = 'block';
+            errorMessageSpan.textContent = '请求失败: ' + error.message + '. 请检查网络连接或服务器状态。';
+            errorMessageContainer.style.display = 'block';
+            localHashSpan.textContent = '错误';
+            remoteHashSpan.textContent = '错误';
+            matchStatusSpan.textContent = '错误';
+            matchStatusSpan.className = 'error';
+            remoteImagePreview.onerror(); // 网络错误也可能导致远程图片无法访问
+        } finally {
+            loadingSpinner.style.display = 'none';
+        }
+    });
+</script>
+</body>
+</html>
